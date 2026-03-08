@@ -2,6 +2,8 @@ import streamlit as st
 import smtplib
 import json
 import os
+import requests
+import urllib.parse
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import date
@@ -670,6 +672,69 @@ with st.expander("Configure & Send Email"):
                     st.success("✅ Email sent successfully!")
                 except Exception as e:
                     st.error(f"Failed to send email: {e}")
+
+# ─────────────────────────────────────
+#  WHATSAPP  SUMMARY SECTION
+# ─────────────────────────────────────
+st.markdown("---")
+st.subheader("📱 WhatsApp Daily Summary")
+
+with st.expander("Configure & Send WhatsApp Message"):
+    st.info(
+        "**Free via CallMeBot:**\n\n"
+        "1. Save **+34 644 71 81 84** in your phone contacts\n"
+        "2. Send `I allow callmebot to send me messages` to that number on WhatsApp\n"
+        "3. You'll receive an **API key** — enter it below\n\n"
+        "[CallMeBot setup guide](https://www.callmebot.com/blog/free-api-whatsapp-messages/)"
+    )
+    with st.form("whatsapp_form"):
+        wcol1, wcol2 = st.columns(2)
+        wa_phone = wcol1.text_input("Phone number (with country code)", placeholder="e.g. +919876543210")
+        wa_apikey = wcol2.text_input("CallMeBot API Key", placeholder="e.g. 1234567")
+
+        wa_btn = st.form_submit_button("📱 Send via WhatsApp")
+
+        if wa_btn:
+            if not wa_phone or not wa_apikey:
+                st.error("Please enter both phone number and API key.")
+            else:
+                # Build plain-text summary
+                lines = []
+                lines.append(f"🔥 *Daily Calorie Tracker*")
+                lines.append(f"📅 {selected_date.strftime('%b %d, %Y')}")
+                lines.append("")
+                for m in MEALS:
+                    items = today_meals.get(m, [])
+                    if items:
+                        meal_cal = sum(i['calories'] for i in items)
+                        meal_p = round(sum(i.get('protein', 0) for i in items), 1)
+                        meal_c = round(sum(i.get('carbs', 0) for i in items), 1)
+                        meal_f = round(sum(i.get('fat', 0) for i in items), 1)
+                        meal_fb = round(sum(i.get('fiber', 0) for i in items), 1)
+                        lines.append(f"🍽️ *{m}*")
+                        for item in items:
+                            lines.append(f"  • {item['name']} — {item['quantity']} {item['unit_label']} — {item['calories']} kcal")
+                        lines.append(f"  _{m} Total: {meal_cal} kcal | P:{meal_p}g C:{meal_c}g F:{meal_f}g Fiber:{meal_fb}g_")
+                        lines.append("")
+                lines.append(f"🔥 *Grand Total: {grand_total} kcal*")
+                lines.append(f"P: {grand_protein}g · C: {grand_carbs}g · F: {grand_fat}g · Fiber: {grand_fiber}g")
+
+                message = "\n".join(lines)
+                encoded_msg = urllib.parse.quote(message)
+                phone_clean = wa_phone.strip().replace(" ", "").replace("-", "")
+                if phone_clean.startswith("+"):
+                    phone_clean = phone_clean[1:]
+
+                url = f"https://api.callmebot.com/whatsapp.php?phone={phone_clean}&text={encoded_msg}&apikey={wa_apikey.strip()}"
+
+                try:
+                    resp = requests.get(url, timeout=30)
+                    if resp.status_code == 200 and "queued" in resp.text.lower():
+                        st.success("✅ WhatsApp message sent successfully!")
+                    else:
+                        st.error(f"Failed: {resp.text}")
+                except Exception as e:
+                    st.error(f"Error sending WhatsApp message: {e}")
 
 # ─────────────────────────────────────
 #  FOOTER
